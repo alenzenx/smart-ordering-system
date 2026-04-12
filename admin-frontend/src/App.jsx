@@ -22,6 +22,22 @@ function formatDateTime(value) {
   }).format(new Date(value));
 }
 
+async function parseJsonResponse(response) {
+  const text = await response.text();
+
+  if (!text) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(
+      `伺服器回傳不是 JSON（HTTP ${response.status}）。請確認後端服務已啟動，並查看 Docker backend logs。`
+    );
+  }
+}
+
 function App() {
   const [items, setItems] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -45,7 +61,7 @@ function App() {
         throw new Error("無法載入菜單資料");
       }
 
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       setItems(data);
     } catch (err) {
       setError(err.message);
@@ -63,7 +79,7 @@ function App() {
         throw new Error("無法載入訂單資料");
       }
 
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       setOrders(data);
     } catch (err) {
       setError(err.message);
@@ -132,7 +148,7 @@ function App() {
         body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       if (!response.ok) {
         throw new Error(data.error || "儲存失敗");
       }
@@ -167,7 +183,7 @@ function App() {
       const response = await fetch(`/api/menu-items/${id}/`, {
         method: "DELETE",
       });
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
 
       if (!response.ok) {
         throw new Error(data.error || "刪除失敗");
@@ -203,7 +219,7 @@ function App() {
         method: "POST",
         body: formData,
       });
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
 
       if (!response.ok) {
         throw new Error(data.error || "Excel 匯入失敗");
@@ -233,7 +249,7 @@ function App() {
       const response = await fetch(`/api/orders/${orderId}/`, {
         method: "DELETE",
       });
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
 
       if (!response.ok) {
         throw new Error(data.error || "刪除訂單失敗");

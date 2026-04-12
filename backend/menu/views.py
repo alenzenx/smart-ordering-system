@@ -3,12 +3,14 @@ import os
 import re
 import subprocess
 from decimal import Decimal, InvalidOperation
+from zipfile import BadZipFile
 
 from django.db import transaction
 from django.db.models import ProtectedError
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from openpyxl import load_workbook
+from openpyxl.utils.exceptions import InvalidFileException
 
 from .models import MenuItem, Order, OrderItem
 
@@ -1135,14 +1137,22 @@ def import_menu_items_xlsx(request):
 
     try:
         parsed_items = parse_menu_items_xlsx(uploaded_file)
-    except ValueError as exc:
-        return JsonResponse({"error": str(exc)}, status=400)
+    except (ValueError, BadZipFile, InvalidFileException, OSError) as exc:
+        return JsonResponse({"error": f"Excel 匯入失敗：{exc}"}, status=400)
+    except Exception as exc:
+        return JsonResponse(
+            {"error": f"Excel 匯入失敗，請確認檔案格式與內容：{exc}"},
+            status=400,
+        )
 
-    with transaction.atomic():
-        OrderItem.objects.all().delete()
-        Order.objects.all().delete()
-        MenuItem.objects.all()._raw_delete(MenuItem.objects.db)
-        MenuItem.objects.bulk_create([MenuItem(**item) for item in parsed_items])
+    try:
+        with transaction.atomic():
+            OrderItem.objects.all().delete()
+            Order.objects.all().delete()
+            MenuItem.objects.all()._raw_delete(MenuItem.objects.db)
+            MenuItem.objects.bulk_create([MenuItem(**item) for item in parsed_items])
+    except Exception as exc:
+        return JsonResponse({"error": f"資料庫更新失敗：{exc}"}, status=500)
 
     return JsonResponse(
         {
