@@ -167,11 +167,6 @@ Gemini 助理有兩層行為：
 - Gemini CLI 不可用或未登入：後端會退回本地規則模式，仍可處理常見加菜、改數量、刪除、清空與部分推薦。
 
 因此本專案是零設定可跑，但如果你想讓助理使用真正的 Gemini CLI，就需要完成 Gemini CLI 登入。
-cmd跑指令
-```
-gemini
-```
-即可設定。
 
 ### 本專案的 Gemini CLI 是怎麼安裝的
 
@@ -182,6 +177,11 @@ RUN npm install -g @google/gemini-cli@latest
 ```
 
 所以只要你使用 Docker，就不需要在主機手動安裝 Gemini CLI 才能讓 container 找到 `gemini` 指令。
+cmd跑指令
+```
+gemini
+```
+即可設定 Gemini CLI ，才能完成 Gemini CLI 登入。
 
 ### 為什麼仍然需要登入
 
