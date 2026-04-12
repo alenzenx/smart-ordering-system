@@ -111,12 +111,13 @@ Gemini 助理有兩層行為：
 RUN npm install -g @google/gemini-cli@latest
 ```
 
-所以只要你使用 Docker，就不需要在主機手動安裝 Gemini CLI 才能讓 container 找到 `gemini` 指令。
-cmd跑指令
+所以只要你使用 Docker，當 Docker 啟動就已經自動安裝 Gemini CLI 了。
+
+但第一次需要 cmd 跑指令
 ```
 gemini
 ```
-即可設定 Gemini CLI ，才能完成 Gemini CLI 登入。
+設定 Gemini CLI ，才能完成 Gemini CLI 登入。
 
 第一次執行 `gemini` 時，依照官方文件，選擇 `Login with Google` 並完成瀏覽器登入。登入後 Gemini CLI 會在使用者目錄下建立設定與驗證資料。
 
