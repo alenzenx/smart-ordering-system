@@ -1,107 +1,55 @@
 # 智慧點餐系統
 
-本專案是一套可在本機以 Docker 啟動的智慧點餐系統，包含兩個不同的網頁：
+這是一套可在本機直接以 Docker 啟動的智慧點餐系統，包含：
 
-- 顧客端點餐系統
-- 後台管理系統
-
-技術組成：
-
-- React 前端
-- Django 後端 API
+- 顧客端點餐網站
+- 後台管理網站
+- Django API
 - MySQL 資料庫
-- phpMyAdmin 資料庫圖形介面
-- Gemini CLI 點餐助理
-- Docker Compose 一鍵啟動
+- phpMyAdmin 圖形管理介面
+- Gemini 點餐助理
 
-## 功能總覽
+## 特色
 
-### 顧客端
+- 零設定可啟動：不需要先建立 `.env`
+- 前後台分離：顧客端與後台是兩個不同網頁
+- 後台可管理菜單 CRUD
+- 顧客可加入購物車、清空購物車、送出訂單
+- 後台可查看與刪除訂單
+- 支援 Excel 覆蓋匯入菜單
+- 匯入菜單時會一併清空舊訂單
+- Gemini 助理可幫忙加菜、刪菜、改數量
 
-- 瀏覽菜單
-- 加入購物車、調整數量、清空購物車
-- 送出訂單並即時計算總金額
-- 右側常駐 `Gemini 點餐助理`
-- Gemini 可協助加菜、刪菜、改數量，但不會直接代替顧客送單
+## 技術組成
 
-### 後台管理系統
-
-- 菜單 CRUD
-- 訂單列表顯示
-- 訂單刪除
-- 匯入 `.xlsx` 菜單
-- 匯入時會覆蓋所有舊菜單
-- 匯入時會一併清空所有舊訂單與訂單明細
+- React
+- Django
+- MySQL 8.4
+- phpMyAdmin
+- Docker Compose
+- Gemini CLI
 
 ## 系統架構
 
 - `admin-frontend`
   - 後台管理系統
-  - 預設網址: `http://localhost:5173`
+  - 入口網址：`http://localhost:5173`
 - `customer-frontend`
   - 顧客點餐系統
-  - 預設網址: `http://localhost:5174`
+  - 入口網址：`http://localhost:5174`
 - `backend`
   - Django API
-  - 預設網址: `http://localhost:8000`
+  - 入口網址：`http://localhost:8000`
 - `db`
-  - MySQL 8.4
-  - 預設連接埠: `3306`
+  - MySQL
+  - 連接埠：`3306`
 - `phpmyadmin`
-  - MySQL 圖形管理介面
-  - 預設網址: `http://localhost:8080`
+  - MySQL 圖形介面
+  - 入口網址：`http://localhost:8080`
 
-## 啟動前需求
+## 零設定啟動
 
-### 1. 安裝 Docker Desktop
-
-本專案以 Docker Compose 啟動，請先在 Windows 安裝 Docker Desktop 並確認可正常執行。
-
-### 2. 準備 Gemini CLI 授權
-
-本專案的點餐助理不是直接呼叫 API key，而是由後端容器透過 Gemini CLI 執行。
-
-Docker 會將你 Windows 使用者目錄下的：
-
-```text
-%USERPROFILE%\.gemini
-```
-
-掛載到 container 內的：
-
-```text
-/root/.gemini
-```
-
-因此你需要先在 Windows 主機上完成 Gemini CLI 登入，讓 `%USERPROFILE%\.gemini` 內有授權資料。
-
-如果你使用的是一般個人 OAuth 登入，常見授權檔案會包含：
-
-- `%USERPROFILE%\.gemini\oauth_creds.json`
-- `%USERPROFILE%\.gemini\settings.json`
-
-`settings.json` 需要是合法 JSON，且不能帶 UTF-8 BOM。
-
-本專案目前使用的 CLI 模型設定在：
-
-```env
-GEMINI_CLI_MODEL=gemini-2.5-flash
-```
-
-## 環境變數
-
-請參考 [.env.example](C:/Users/Alen/Documents/New%20project/.env.example)。
-
-目前需要的變數只有：
-
-```env
-GEMINI_CLI_COMMAND=gemini
-GEMINI_CLI_MODEL=gemini-2.5-flash
-```
-
-如果你已經有 `.env`，通常不用再修改。
-
-## 啟動方式
+本專案目前已調整成不需要 `.env` 也能直接啟動。
 
 在專案根目錄執行：
 
@@ -109,11 +57,12 @@ GEMINI_CLI_MODEL=gemini-2.5-flash
 docker compose up --build -d
 ```
 
-如果只是重新啟動全部服務：
+啟動完成後可直接開啟：
 
-```powershell
-docker compose up -d --force-recreate
-```
+- 後台管理系統：[http://localhost:5173](http://localhost:5173)
+- 顧客點餐系統：[http://localhost:5174](http://localhost:5174)
+- Django API：[http://localhost:8000](http://localhost:8000)
+- phpMyAdmin：[http://localhost:8080](http://localhost:8080)
 
 查看服務狀態：
 
@@ -121,134 +70,143 @@ docker compose up -d --force-recreate
 docker compose ps
 ```
 
-## 啟動後網址
+關閉服務：
 
-- 後台管理系統: [http://localhost:5173](http://localhost:5173)
-- 顧客點餐系統: [http://localhost:5174](http://localhost:5174)
-- Django API: [http://localhost:8000](http://localhost:8000)
-- phpMyAdmin: [http://localhost:8080](http://localhost:8080)
+```powershell
+docker compose down
+```
 
-## MySQL 與 phpMyAdmin
+## `.env` 與 `.env.example`
 
-### MySQL 連線資訊
+### 是否一定需要 `.env`
 
-- Host: `localhost`
-- Port: `3306`
-- Database: `smart_ordering`
-- User: `smart_user`
-- Password: `smart_pass`
-- Root Password: `root_pass`
+不需要。
 
-### phpMyAdmin
+目前 `docker-compose.yml` 已經內建預設值，所以專案可以直接啟動。
 
-網址：
+### `.env.example` 的用途
 
-- [http://localhost:8080](http://localhost:8080)
+`.env.example` 只用來提供「可選的覆寫設定」，例如：
 
-目前 compose 已配置成直接連到容器內的 MySQL。
+```env
+GEMINI_CLI_COMMAND=gemini
+GEMINI_CLI_MODEL=gemini-2.5-flash
+```
 
-## 使用流程
+如果你想自行改 Gemini CLI 指令或模型，可以再把 `.env.example` 複製成 `.env`。
 
-### 顧客端點餐
+## Gemini 助理行為
+
+### 預設模式
+
+顧客端右側有常駐的 `Gemini 點餐助理`。
+
+它可以：
+
+- 推薦菜品
+- 說明價格
+- 說明過敏原
+- 加入購物車
+- 修改數量
+- 刪除品項
+- 清空購物車
+
+它不會：
+
+- 直接替你送出訂單
+
+### 零設定下怎麼運作
+
+本專案支援兩種模式：
+
+1. `Gemini CLI 可用`
+   - 後端會呼叫 Gemini CLI 產生回覆
+2. `Gemini CLI 尚未登入或不可用`
+   - 系統會自動退回本地規則模式
+   - 仍可正常處理基本加菜、刪菜、改數量、推薦與查詢
+
+也就是說：
+
+- 沒有 `.env` 也能跑
+- 沒有登入 Gemini CLI 也不會讓整個系統壞掉
+- 只是助理會退回較簡單的本地規則回覆
+
+### 如果你想啟用真正的 Gemini CLI
+
+在 Windows 主機上先完成 Gemini CLI 登入，並讓以下資料夾存在：
+
+```text
+%USERPROFILE%\.gemini
+```
+
+Docker 會將它掛載到 backend container 的：
+
+```text
+/root/.gemini
+```
+
+如果登入成功，助理就會優先使用 Gemini CLI。
+
+## 顧客端使用流程
 
 1. 開啟 [http://localhost:5174](http://localhost:5174)
 2. 從菜單選擇品項
-3. 使用 `+`、`-` 調整數量
-4. 也可以透過右側 `Gemini 點餐助理` 直接輸入自然語句，例如：
-   - `幫我加兩杯蜜桃冷泡茶`
+3. 用 `+` / `-` 調整數量
+4. 或直接透過右側 Gemini 助理輸入，例如：
+   - `幫我加兩份蔥香牛肉捲餅`
    - `把剛剛那個刪掉`
    - `推薦一個飯類`
-5. 確認購物車內容
-6. 按 `送出訂單`
+   - `蜜桃冷泡茶多少錢`
+5. 確認右側購物車
+6. 可按：
+   - `清空購物車`
+   - `送出訂單`
 
-### 顧客端購物車功能
-
-- `送出訂單`
-  - 送出目前購物車內容到後端
-- `清空購物車`
-  - 直接清空前台購物車
-
-### 後台管理
+## 後台使用流程
 
 1. 開啟 [http://localhost:5173](http://localhost:5173)
-2. 管理菜單
-3. 查看訂單
+2. 進行菜單 CRUD
+3. 查看顧客送出的訂單
 4. 刪除訂單
-5. 需要大量更新菜單時，使用 Excel 匯入
+5. 需要大量更新時可用 Excel 匯入菜單
 
-## Excel 匯入說明
+## Excel 匯入規則
 
-### 匯入入口
+### 上傳格式
 
-後台管理系統中有 Excel 匯入按鈕，可上傳 `.xlsx` 檔案。
-
-### 匯入格式
-
-匯入檔案格式必須符合 `test.xlsx` 的欄位順序。
-
-欄位如下：
+後台可上傳 `.xlsx` 檔案，格式需符合 `test.xlsx`：
 
 ```text
 菜品名稱 | 菜品價格 | 過敏原 | 菜品介紹
 ```
 
-注意：
+### 匯入後會發生什麼
 
-- 匯入格式沒有包含 `菜品 ID`
-- `菜品 ID` 由資料庫重新建立
-- 匯入時會覆蓋整份菜單
-- 匯入時會清空舊訂單與訂單明細
-- 每次重新匯入後，菜單的 ID 可能會與上一版不同
+匯入時系統會：
 
-### 匯入流程
+- 清空 `menu_orderitem`
+- 清空 `menu_order`
+- 清空 `menu_menuitem`
+- 重新建立整份菜單
 
-1. 在後台按 Excel 匯入
-2. 選擇符合 `test.xlsx` 格式的 `.xlsx`
-3. 送出後，系統會：
-   - 清空 `menu_orderitem`
-   - 清空 `menu_order`
-   - 清空 `menu_menuitem`
-   - 重新寫入新的菜單資料
+### 重要影響
 
-## Gemini 點餐助理說明
+- 匯入格式本身不包含 `菜品 ID`
+- `菜品 ID` 由資料庫重新產生
+- 每次重新匯入後，新的菜單 ID 可能和上一版不同
 
-### 助理目前行為
+## 菜單與聊天同步機制
 
-Gemini 助理可以：
+為了避免後台匯入新菜單後，顧客端仍保留舊的菜單 ID，前台已加入同步保護：
 
-- 根據菜單推薦品項
-- 說明價格
-- 說明過敏原
-- 幫忙加到購物車
-- 幫忙修改數量
-- 幫忙刪除品項
-- 幫忙清空購物車
+- 每 5 秒檢查一次菜單是否更新
+- 送出聊天前會先同步一次菜單
+- 如果助理回傳的 `menu_item_id` 不在前台目前菜單中，前台會立即重新抓菜單再套用
 
-Gemini 助理不會：
-
-- 直接幫你送出訂單
-- 在沒有菜單資料的情況下亂湊品項
-
-### 助理運作方式
-
-目前後端 `POST /api/chat/` 只保留 Gemini CLI 路徑，不再走 API key 備援。
-
-實作位置：
-
-- [backend/menu/views.py](C:/Users/Alen/Documents/New%20project/backend/menu/views.py)
-
-### 菜單同步防呆
-
-為了避免後台匯入新菜單後，顧客端仍保留舊 ID 與舊對話上下文，前台已加入兩層保護：
-
-- 每 5 秒自動同步一次最新菜單
-- 聊天送出前先同步菜單一次
-- 如果 Gemini 回傳的 `menu_item_id` 不在前台目前菜單中，前台會立刻重新抓最新菜單再套用
-
-若偵測到菜單已變更，顧客端會：
+當前台偵測到菜單已變更時，會自動：
 
 - 清空購物車
-- 重置 Gemini 對話
+- 重置助理對話
 
 ## API 一覽
 
@@ -263,7 +221,7 @@ PUT    /api/menu-items/<id>/
 DELETE /api/menu-items/<id>/
 ```
 
-新增或修改菜單的 JSON 範例：
+新增或修改菜單範例：
 
 ```json
 {
@@ -283,7 +241,7 @@ GET    /api/orders/<id>/
 DELETE /api/orders/<id>/
 ```
 
-建立訂單 JSON 範例：
+建立訂單範例：
 
 ```json
 {
@@ -313,7 +271,7 @@ POST /api/chat/
   "messages": [
     {
       "role": "user",
-      "content": "幫我加兩杯蜜桃冷泡茶"
+      "content": "幫我加兩份蔥香牛肉捲餅"
     }
   ],
   "cart": [
@@ -343,18 +301,31 @@ POST /api/chat/
 
 說明：
 
-- `menu_item_id` 會依照目前資料庫中的菜單決定
-- 如果你重新匯入 Excel，這些 ID 可能改變
+- `menu_item_id` 會依照目前資料庫菜單而定
+- 如果菜單重新匯入，ID 可能改變
 
-## 資料表
+## MySQL 連線資訊
 
-本專案主要會用到以下三張表：
+- Host：`localhost`
+- Port：`3306`
+- Database：`smart_ordering`
+- User：`smart_user`
+- Password：`smart_pass`
+- Root Password：`root_pass`
+
+## phpMyAdmin
+
+網址：
+
+- [http://localhost:8080](http://localhost:8080)
+
+## 主要資料表
 
 - `menu_menuitem`
 - `menu_order`
 - `menu_orderitem`
 
-另外可參考：
+額外 SQL 範例可參考：
 
 - [docs/mysql-crud-examples.sql](C:/Users/Alen/Documents/New%20project/docs/mysql-crud-examples.sql)
 
@@ -390,50 +361,50 @@ docker compose up --build -d customer-frontend
 docker compose logs backend --tail 100
 ```
 
-查看所有服務狀態：
+關閉全部服務：
 
 ```powershell
-docker compose ps
+docker compose down
 ```
 
 ## 常見問題
 
-### 1. 顧客端聊天有回覆，但購物車沒更新
+### 1. 拉下 repo 後為什麼沒有 `.env`
 
-先確認：
+這是正常的。
 
-- 顧客端頁面是否已刷新到最新版本
-- 後台是否剛匯入新菜單
+`.env` 沒有被提交到 GitHub，但目前專案已經不需要 `.env` 才能啟動。
 
-本專案已加入菜單同步機制，但如果你在非常短時間內連續大量覆蓋菜單，建議直接重新整理顧客頁面再測一次。
+### 2. Gemini 助理回覆了，但購物車沒更新
 
-### 2. Gemini CLI 回傳授權錯誤
+請先確認：
 
-請檢查 `%USERPROFILE%\.gemini` 是否存在，且裡面有有效授權資料。
+- 顧客端是否已刷新到最新版本
+- 後台是否剛重新匯入菜單
 
-重點：
+目前前台已加入菜單同步保護，若仍遇到問題，重新整理顧客頁面後再試一次。
 
-- `settings.json` 必須是合法 JSON
-- `settings.json` 不可帶 BOM
-- Docker backend 需要能讀到該資料夾
-
-### 3. 為什麼匯入 Excel 後舊訂單不見了
+### 3. 為什麼 Excel 匯入後舊訂單會消失
 
 這是目前設計規格。
 
-Excel 匯入採用：
+因為匯入會重建菜單 ID，如果保留舊訂單，會很容易對到不存在的舊菜單資料。
 
-- 覆蓋菜單
-- 一併清空舊訂單
+### 4. 沒登入 Gemini CLI 能不能用
 
-目的是避免舊訂單對應到已不存在或已變更的菜單 ID。
+可以。
 
-### 4. 如何看 MySQL 內容
+系統仍可正常啟動，且聊天會退回本地規則模式。
 
-有兩種方式：
+### 5. 如何查看資料庫
 
-- 用 phpMyAdmin: [http://localhost:8080](http://localhost:8080)
-- 用你自己的 MySQL Client 連線到 `localhost:3306`
+可直接開：
+
+- [http://localhost:8080](http://localhost:8080)
+
+或使用你自己的 MySQL Client 連到：
+
+- `localhost:3306`
 
 ## 專案目錄
 
@@ -443,13 +414,14 @@ Excel 匯入採用：
 ├─ customer-frontend
 ├─ backend
 ├─ docs
+├─ scripts
 ├─ docker-compose.yml
-├─ .env
+├─ .env.example
 └─ README.md
 ```
 
 ## 備註
 
-- 後端啟動時會先等待 MySQL 可連線，再自動執行 migration
-- 顧客端與後台是兩個不同的 React 網頁
-- 本專案目前定位為本機開發與展示版本，不是正式 production 部署配置
+- backend 啟動時會先等待 MySQL 可連線，再自動執行 migration
+- 顧客端與後台是兩個獨立 React 網頁
+- 這是本機開發與展示版本，不是正式 production 部署配置

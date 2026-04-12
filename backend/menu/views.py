@@ -1127,3 +1127,188 @@ def chat_with_cli(request):
 
 chat_with_llm = chat_with_cli
 chat_with_gpt = chat_with_cli
+
+
+def get_menu_items_in_order(item_ids):
+    items_by_id = {
+        item.id: item
+        for item in MenuItem.objects.filter(id__in=item_ids)
+    }
+    return [items_by_id[item_id] for item_id in item_ids if item_id in items_by_id]
+
+
+def format_menu_item_brief(item):
+    return f"{item.name}（NT$ {item.price}）"
+
+
+def build_local_menu_reply(latest_message, cart_snapshot):
+    price_keywords = ("多少錢", "價格", "價錢", "多少")
+    allergen_keywords = ("過敏原", "會過敏", "有什麼不能吃")
+    description_keywords = ("介紹", "是什麼", "內容", "說明")
+    recommendation_keywords = ("推薦", "有什麼", "想吃", "吃什麼", "來點", "套餐")
+
+    mentioned_item_ids = find_item_ids_in_text(latest_message)
+    mentioned_items = get_menu_items_in_order(mentioned_item_ids[:5])
+
+    if cart_snapshot and any(keyword in latest_message for keyword in ("總金額", "合計", "一共", "多少錢")):
+        items_by_id = {
+            item.id: item for item in MenuItem.objects.filter(id__in=[entry["menu_item_id"] for entry in cart_snapshot])
+        }
+        total_price = Decimal("0.00")
+        for entry in cart_snapshot:
+            menu_item = items_by_id.get(entry["menu_item_id"])
+            if menu_item is not None:
+                total_price += menu_item.price * entry["quantity"]
+        if total_price > 0:
+            return {
+                "reply": f"目前購物車總金額為 NT$ {total_price:.2f}。",
+                "actions": [],
+            }
+
+    if mentioned_items and any(keyword in latest_message for keyword in price_keywords):
+        if len(mentioned_items) == 1:
+            item = mentioned_items[0]
+            return {
+                "reply": f"{item.name} 的價格是 NT$ {item.price}。",
+                "actions": [],
+            }
+        return {
+            "reply": "；".join(f"{item.name} NT$ {item.price}" for item in mentioned_items),
+            "actions": [],
+        }
+
+    if mentioned_items and any(keyword in latest_message for keyword in allergen_keywords):
+        if len(mentioned_items) == 1:
+            item = mentioned_items[0]
+            allergens = item.allergens or "未標示過敏原"
+            return {
+                "reply": f"{item.name} 的過敏原資訊：{allergens}。",
+                "actions": [],
+            }
+        return {
+            "reply": "；".join(
+                f"{item.name}：{item.allergens or '未標示過敏原'}"
+                for item in mentioned_items
+            ),
+            "actions": [],
+        }
+
+    if mentioned_items and any(keyword in latest_message for keyword in description_keywords):
+        item = mentioned_items[0]
+        description = item.description or "目前沒有更多介紹。"
+        return {
+            "reply": f"{item.name}：{description}",
+            "actions": [],
+        }
+
+    if any(keyword in latest_message for keyword in recommendation_keywords):
+        all_items = list(MenuItem.objects.all())
+        if not all_items:
+            return {
+                "reply": "目前沒有可推薦的菜品。",
+                "actions": [],
+            }
+
+        keyword_groups = [
+            ("飲料", ("飲料", "喝", "茶", "奶茶", "咖啡", "冷泡", "果汁", "汽水")),
+            ("酒", ("酒", "啤酒", "紅酒", "白酒", "highball", "沙瓦")),
+            ("飯類", ("飯", "炒飯", "燴飯", "丼", "粥")),
+            ("麵類", ("麵", "拉麵", "拌麵", "湯麵", "義大利麵")),
+            ("餃類", ("餃", "水餃", "煎餃", "鍋貼")),
+            ("餅類", ("餅", "捲餅", "蔥油餅", "蛋餅")),
+        ]
+
+        normalized_message = normalize_lookup_text(latest_message)
+        candidates = all_items
+
+        for _, keywords in keyword_groups:
+            if not any(normalize_lookup_text(keyword) in normalized_message for keyword in keywords):
+                continue
+
+            filtered = []
+            for item in all_items:
+                haystack = normalize_lookup_text(f"{item.name} {item.description or ''}")
+                if any(normalize_lookup_text(keyword) in haystack for keyword in keywords):
+                    filtered.append(item)
+
+            if filtered:
+                candidates = filtered
+                break
+
+        suggestions = candidates[:3]
+        return {
+            "reply": "推薦您：" + "、".join(format_menu_item_brief(item) for item in suggestions) + "。",
+            "actions": [],
+        }
+
+    if any(keyword in latest_message for keyword in ("加", "加入", "刪", "移除", "不要", "清空")) and not mentioned_items:
+        return {
+            "reply": "我目前找不到對應的菜品，請直接輸入菜名或使用菜單上的名稱。",
+            "actions": [],
+        }
+
+    return {
+        "reply": "您可以直接說菜名與數量，例如「幫我加兩份蔥香牛肉捲餅」或「推薦一個飯類」。",
+        "actions": [],
+    }
+
+
+def build_zero_config_chat_response(messages, cart_snapshot, model):
+    shortcut_actions = infer_actions_from_latest_message(messages, cart_snapshot)
+    if shortcut_actions:
+        return {
+            "reply": build_action_reply(shortcut_actions),
+            "actions": shortcut_actions,
+            "model": model,
+        }
+
+    try:
+        response_text = call_gemini_cli(model, messages, cart_snapshot)
+        parsed_response = parse_chat_response(response_text)
+    except (RuntimeError, subprocess.TimeoutExpired, ValueError, json.JSONDecodeError, OSError, Exception):
+        parsed_response = build_local_menu_reply(find_latest_user_message(messages), cart_snapshot)
+        return {
+            "reply": parsed_response["reply"],
+            "actions": parsed_response["actions"],
+            "model": "local-rules",
+        }
+
+    if not parsed_response["actions"]:
+        fallback_actions = infer_actions_from_latest_message(messages, cart_snapshot)
+        if fallback_actions:
+            parsed_response["actions"] = fallback_actions
+            if not parsed_response["reply"]:
+                parsed_response["reply"] = build_action_reply(fallback_actions)
+
+    if not parsed_response["reply"]:
+        local_response = build_local_menu_reply(find_latest_user_message(messages), cart_snapshot)
+        parsed_response["reply"] = local_response["reply"]
+        if not parsed_response["actions"]:
+            parsed_response["actions"] = local_response["actions"]
+
+    return {
+        "reply": parsed_response["reply"],
+        "actions": parsed_response["actions"],
+        "model": model,
+    }
+
+
+@csrf_exempt
+def chat_with_zero_config(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    try:
+        payload = parse_payload(request)
+        messages = validate_chat_messages(payload)
+        cart_snapshot = validate_cart_snapshot(payload)
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+
+    model = os.environ.get("GEMINI_CLI_MODEL", "gemini-2.5-flash").strip() or "gemini-2.5-flash"
+    response_payload = build_zero_config_chat_response(messages, cart_snapshot, model)
+    return JsonResponse(response_payload)
+
+
+chat_with_llm = chat_with_zero_config
+chat_with_gpt = chat_with_zero_config
