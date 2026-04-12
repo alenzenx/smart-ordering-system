@@ -467,6 +467,18 @@ def find_latest_user_message(messages):
     return ""
 
 
+def find_previous_user_message(messages):
+    found_latest = False
+    for message in reversed(messages):
+        if message["role"] != "user":
+            continue
+        if not found_latest:
+            found_latest = True
+            continue
+        return message["content"].strip()
+    return ""
+
+
 def build_latest_user_turn(messages):
     latest_message = find_latest_user_message(messages)
     if not latest_message:
@@ -489,6 +501,27 @@ def is_unhelpful_model_reply(reply):
         "沒有辦法",
     )
     return any(marker in normalized for marker in refusal_markers)
+
+
+def is_confirmation_message(text):
+    normalized = normalize_lookup_text(text)
+    return normalized in {
+        "對",
+        "對的",
+        "是",
+        "是的",
+        "好",
+        "好啊",
+        "可以",
+        "沒錯",
+        "正確",
+        "就這個",
+        "就這樣",
+        "這個",
+        "那個",
+        "ok",
+        "okay",
+    }
 
 
 def build_action_reply(actions):
@@ -638,6 +671,38 @@ def find_item_ids_in_text(text, item_ids=None):
     return matches
 
 
+def find_referenced_menu_item_ids(text, item_ids=None):
+    valid_ids = set(MenuItem.objects.values_list("id", flat=True))
+    if item_ids is not None:
+        valid_ids &= {int(item_id) for item_id in item_ids}
+
+    matches = []
+    for match in re.finditer(r"\bID\s*(\d+)\b", str(text), re.IGNORECASE):
+        item_id = int(match.group(1))
+        if item_id in valid_ids and item_id not in matches:
+            matches.append(item_id)
+
+    for item_id in find_item_ids_in_text(text, item_ids):
+        if item_id not in matches:
+            matches.append(item_id)
+
+    return matches
+
+
+def find_recent_referenced_menu_item_ids(messages):
+    latest_user_skipped = False
+    for message in reversed(messages):
+        if message["role"] == "user" and not latest_user_skipped:
+            latest_user_skipped = True
+            continue
+
+        referenced_ids = find_referenced_menu_item_ids(message["content"])
+        if referenced_ids:
+            return referenced_ids
+
+    return []
+
+
 def infer_actions_from_latest_message(messages, cart_snapshot):
     latest_message = find_latest_user_message(messages)
     if not latest_message:
@@ -651,7 +716,21 @@ def infer_actions_from_latest_message(messages, cart_snapshot):
     info_keywords = ("多少錢", "價格", "價錢", "過敏原", "介紹", "推薦", "有什麼", "是什麼", "好吃嗎")
     cart_item_ids = [item["menu_item_id"] for item in cart_snapshot]
     mentioned_cart_items = find_item_ids_in_text(latest_message, cart_item_ids)
-    mentioned_menu_items = find_item_ids_in_text(latest_message)
+    mentioned_menu_items = find_referenced_menu_item_ids(latest_message)
+    previous_user_message = find_previous_user_message(messages)
+
+    if is_confirmation_message(latest_message):
+        recent_item_ids = find_recent_referenced_menu_item_ids(messages)
+        if recent_item_ids:
+            return normalize_chat_actions(
+                [
+                    {
+                        "type": "set_quantity",
+                        "menu_item_id": recent_item_ids[0],
+                        "quantity": extract_quantity_from_text(latest_message, default=1),
+                    }
+                ]
+            )
 
     if any(keyword in latest_message for keyword in info_keywords):
         return []
@@ -686,6 +765,23 @@ def infer_actions_from_latest_message(messages, cart_snapshot):
                     "type": "remove_item",
                     "menu_item_id": cart_snapshot[0]["menu_item_id"],
                 }
+            ]
+        )
+
+    order_context_keywords = add_keywords + ("喝", "一杯", "杯", "冰", "冷", "飲料", "想喝", "幫我找")
+    if (
+        mentioned_menu_items
+        and previous_user_message
+        and any(keyword in previous_user_message for keyword in order_context_keywords)
+    ):
+        return normalize_chat_actions(
+            [
+                {
+                    "type": "set_quantity",
+                    "menu_item_id": menu_item_id,
+                    "quantity": extract_quantity_from_text(previous_user_message, default=1),
+                }
+                for menu_item_id in mentioned_menu_items
             ]
         )
 
@@ -1175,6 +1271,38 @@ def extract_budget_amount(text):
     return max(amounts) if amounts else None
 
 
+def decimal_to_cents(value):
+    return int(Decimal(value) * 100)
+
+
+def choose_budget_combo(menu_items, target_amount, max_items=10):
+    target_cents = decimal_to_cents(target_amount)
+    states = {0: []}
+
+    for item in menu_items:
+        item_cents = decimal_to_cents(item.price)
+        if item_cents <= 0:
+            continue
+
+        next_states = dict(states)
+        for current_cents, combo in states.items():
+            if len(combo) >= max_items:
+                continue
+
+            next_cents = current_cents + item_cents
+            if next_cents > target_cents:
+                continue
+
+            next_combo = combo + [item]
+            if next_cents not in next_states or len(next_combo) < len(next_states[next_cents]):
+                next_states[next_cents] = next_combo
+
+        states = next_states
+
+    best_cents = max(states)
+    return states[best_cents], Decimal(best_cents) / Decimal("100")
+
+
 def build_budget_combo_reply(latest_message):
     combo_keywords = ("湊", "預算", "套餐", "組合", "搭配", "配一套", "配餐")
     if not any(keyword in latest_message for keyword in combo_keywords):
@@ -1184,25 +1312,14 @@ def build_budget_combo_reply(latest_message):
     if target_amount is None:
         return None
 
-    menu_items = [
-        item
-        for item in MenuItem.objects.all().order_by("-price", "id")
-        if item.price > 0
-    ]
+    menu_items = list(MenuItem.objects.all().order_by("-price", "id"))
     if not menu_items:
         return {
             "reply": "目前沒有可搭配的菜品。",
             "actions": [],
         }
 
-    chosen_items = []
-    remaining = target_amount
-    for item in menu_items:
-        if len(chosen_items) >= 5:
-            break
-        if item.price <= remaining:
-            chosen_items.append(item)
-            remaining -= item.price
+    chosen_items, total_price = choose_budget_combo(menu_items, target_amount)
 
     if not chosen_items:
         cheapest_item = min(menu_items, key=lambda item: item.price)
@@ -1214,12 +1331,16 @@ def build_budget_combo_reply(latest_message):
             "actions": [],
         }
 
-    total_price = sum((item.price for item in chosen_items), Decimal("0.00"))
+    remaining = target_amount - total_price
+    budget_note = ""
+    if remaining > 0:
+        budget_note = f"，距離 NT$ {target_amount:.2f} 還差 NT$ {remaining:.2f}"
+
     return {
         "reply": (
             "我幫您搭配："
             + "、".join(format_menu_item_brief(item) for item in chosen_items)
-            + f"，合計 NT$ {total_price:.2f}，已加入購物車。"
+            + f"，合計 NT$ {total_price:.2f}{budget_note}，已加入購物車。"
         ),
         "actions": [
             {
@@ -1355,6 +1476,14 @@ def build_zero_config_chat_response(messages, cart_snapshot, model):
             "reply": build_action_reply(shortcut_actions),
             "actions": shortcut_actions,
             "model": model,
+        }
+
+    local_response = build_local_menu_reply(find_latest_user_message(messages), cart_snapshot)
+    if local_response["actions"]:
+        return {
+            "reply": local_response["reply"],
+            "actions": local_response["actions"],
+            "model": "local-rules",
         }
 
     try:
