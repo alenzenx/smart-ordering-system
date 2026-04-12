@@ -2,6 +2,9 @@
 
 本專案是一套本機 Docker 化的智慧點餐系統，包含顧客點餐網頁、後台管理網頁、Django API、MySQL 資料庫、phpMyAdmin 圖形化資料庫介面，以及 Gemini 點餐助理。
 
+## 系統需求
+Windows 10、11
+
 ## 系統畫面
 
 ### 顧客端智慧點餐系統
@@ -50,12 +53,7 @@
 
 ### 必裝：Docker Desktop
 
-這個專案的主要執行方式是 Docker，因此本機只需要先安裝 Docker Desktop。
-
-Windows 建議安裝：
-
-- Docker Desktop for Windows
-- WSL 2 backend，Docker Desktop 安裝流程通常會提示啟用
+這個專案的主要執行方式是 Docker，因此本機只需要先安裝 Docker Desktop for Windows。
 
 確認 Docker 可用：
 
@@ -64,15 +62,62 @@ docker --version
 docker compose version
 ```
 
-### 建議安裝：Git
+### 必裝：Git for Windows
 
-如果你要從 GitHub 拉下專案，建議安裝 Git。
+如果你要從 GitHub 拉下專案，建議安裝 Git for Windows。
 
 確認 Git 可用：
 
 ```powershell
 git --version
 ```
+
+## 必裝：Gemini CLI 安裝與登入
+
+Gemini 助理有兩層行為：
+
+- Gemini CLI 可用且已登入：後端會優先呼叫 Gemini CLI。
+- Gemini CLI 不可用或未登入：後端會退回本地規則模式，仍可處理常見加菜、改數量、刪除、清空與部分推薦。
+
+因此本專案是零設定可跑，但如果你想讓助理使用真正的 Gemini CLI，就需要完成 Gemini CLI 登入。
+
+### 本專案的 Gemini CLI 是怎麼安裝的
+
+後端 Dockerfile 內已經包含：
+
+```dockerfile
+RUN npm install -g @google/gemini-cli@latest
+```
+
+所以只要你使用 Docker，就不需要在主機手動安裝 Gemini CLI 才能讓 container 找到 `gemini` 指令。
+cmd跑指令
+```
+gemini
+```
+即可設定 Gemini CLI ，才能完成 Gemini CLI 登入。
+
+第一次執行 `gemini` 時，依照官方文件，選擇 `Login with Google` 並完成瀏覽器登入。登入後 Gemini CLI 會在使用者目錄下建立設定與驗證資料。
+
+本專案的 `docker-compose.yml` 會把 Windows 主機的 Gemini 設定資料夾掛進 backend container：
+
+```yaml
+volumes:
+  - ${USERPROFILE}/.gemini:/root/.gemini
+```
+
+對 Windows 來說，主機端路徑是：
+
+```text
+%USERPROFILE%\.gemini
+```
+
+掛到 container 內後會變成：
+
+```text
+/root/.gemini
+```
+
+只要這個資料夾內有有效登入資料，backend container 裡的 Gemini CLI 就可以使用。
 
 ### 不需要另外安裝：Node.js、Python、MySQL、phpMyAdmin
 
@@ -88,7 +133,7 @@ git --version
 
 ## 零設定啟動
 
-在專案根目錄執行：
+在專案根目錄執行則可啟動：
 
 ```powershell
 docker compose up --build -d
@@ -137,119 +182,6 @@ docker compose up --build -d admin-frontend
 ```powershell
 docker compose logs backend --tail 100
 ```
-
-## `.env` 與 `.env.example`
-
-本專案目前不需要 `.env` 也能啟動，因為 `docker-compose.yml` 已經內建本機開發用預設值。
-
-`.env.example` 只用來提供可選覆寫設定：
-
-```env
-GEMINI_CLI_COMMAND=gemini
-GEMINI_CLI_MODEL=gemini-2.5-flash
-```
-
-如果你要改 Gemini CLI 指令或模型，可以把 `.env.example` 複製成 `.env`：
-
-```powershell
-Copy-Item .env.example .env
-```
-
-一般情況不需要做這一步。
-
-## Gemini CLI 安裝與登入
-
-### 系統不登入 Gemini CLI 也能跑
-
-Gemini 助理有兩層行為：
-
-- Gemini CLI 可用且已登入：後端會優先呼叫 Gemini CLI。
-- Gemini CLI 不可用或未登入：後端會退回本地規則模式，仍可處理常見加菜、改數量、刪除、清空與部分推薦。
-
-因此本專案是零設定可跑，但如果你想讓助理使用真正的 Gemini CLI，就需要完成 Gemini CLI 登入。
-
-### 本專案的 Gemini CLI 是怎麼安裝的
-
-後端 Dockerfile 內已經包含：
-
-```dockerfile
-RUN npm install -g @google/gemini-cli@latest
-```
-
-所以只要你使用 Docker，就不需要在主機手動安裝 Gemini CLI 才能讓 container 找到 `gemini` 指令。
-cmd跑指令
-```
-gemini
-```
-即可設定 Gemini CLI ，才能完成 Gemini CLI 登入。
-
-### 為什麼仍然需要登入
-
-Gemini CLI 需要 Google 帳號驗證。官方 Gemini CLI 文件的標準安裝方式是：
-
-```powershell
-npm install -g @google/gemini-cli
-gemini
-```
-
-第一次執行 `gemini` 時，依照官方文件，選擇 `Login with Google` 並完成瀏覽器登入。登入後 Gemini CLI 會在使用者目錄下建立設定與驗證資料。
-
-本專案的 `docker-compose.yml` 會把 Windows 主機的 Gemini 設定資料夾掛進 backend container：
-
-```yaml
-volumes:
-  - ${USERPROFILE}/.gemini:/root/.gemini
-```
-
-對 Windows 來說，主機端路徑是：
-
-```text
-%USERPROFILE%\.gemini
-```
-
-掛到 container 內後會變成：
-
-```text
-/root/.gemini
-```
-
-只要這個資料夾內有有效登入資料，backend container 裡的 Gemini CLI 就可以使用。
-
-### 如果你要在 Windows 主機手動安裝 Gemini CLI
-
-這不是零設定啟動的必要條件，只是為了產生 `%USERPROFILE%\.gemini` 登入資料。
-
-1. 安裝 Node.js 20 或更新版本。
-2. 確認 `node` 與 `npm` 可用：
-
-```powershell
-node --version
-npm --version
-```
-
-3. 安裝 Gemini CLI：
-
-```powershell
-npm install -g @google/gemini-cli
-```
-
-4. 執行 Gemini CLI 並登入：
-
-```powershell
-gemini
-```
-
-5. 依照畫面提示選擇 Google 登入。
-6. 登入後重新啟動後端：
-
-```powershell
-docker compose up --build -d backend
-```
-
-### Gemini CLI 相關來源
-
-- Gemini CLI 官方文件：[Get Started with Gemini CLI](https://google-gemini.github.io/gemini-cli/docs/get-started/)
-- npm 套件頁面：[@google/gemini-cli](https://www.npmjs.com/package/@google/gemini-cli)
 
 ## Gemini 助理的安全執行邏輯
 
@@ -477,10 +409,6 @@ SQL CRUD 範例：
 
 ## 常見問題
 
-### 拉下 repo 後沒有 `.env` 可以跑嗎
-
-可以。`.env` 沒有被提交到 GitHub，但 `docker-compose.yml` 已經有預設值。
-
 ### Gemini CLI 沒登入可以跑嗎
 
 可以。系統會退回本地規則模式，只是自然語言理解能力會比 Gemini CLI 模式簡單。
@@ -519,5 +447,5 @@ localhost:3306
 
 - backend 啟動時會先等待 MySQL 可連線，再自動執行 migration。
 - 顧客端與後台是兩個獨立 React 網頁。
-- 這是本機開發與展示版本，不是正式 production 部署配置。
-- `docker-compose.yml` 目前主要以 Windows 開發環境為目標，因為 Gemini CLI 掛載路徑使用 `${USERPROFILE}/.gemini`。
+- 這是本機開發與展示版本。
+- `docker-compose.yml` 目前主要以 Windows 開發環境為目標。
