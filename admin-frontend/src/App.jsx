@@ -413,7 +413,7 @@ function App() {
           <div className="import-panel">
             <div>
               <p className="panel-kicker">Excel Import</p>
-              <h3>用 test.xlsx 格式覆蓋菜單</h3>
+              <h3>用指定欄位格式覆蓋菜單</h3>
               <p className="import-copy">
                 欄位順序必須是：菜品名稱、菜品價格、過敏原、菜品介紹。匯入會覆蓋目前
                 的菜品資料，並同時清空舊訂單與舊訂單明細。

@@ -303,7 +303,7 @@ docker compose up --build -d backend
 
 ## Excel 匯入規則
 
-後台可上傳 `.xlsx` 檔案，欄位需符合 `test.xlsx` 格式：
+後台可上傳 `.xlsx` 檔案，欄位需符合以下格式：
 
 ```text
 菜品名稱 | 菜品價格 | 過敏原 | 菜品介紹

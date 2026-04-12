@@ -991,7 +991,7 @@ def parse_menu_items_xlsx(uploaded_file):
     normalized_headers = [str(value or "").strip() for value in (header_row or ())]
 
     if normalized_headers != EXPECTED_XLSX_HEADERS:
-        raise ValueError("Excel 欄位格式不符合要求，請使用 test.xlsx 的欄位順序。")
+        raise ValueError("Excel 欄位格式不符合要求，欄位順序必須是：菜品名稱、菜品價格、過敏原、菜品介紹。")
 
     parsed_items = []
 
