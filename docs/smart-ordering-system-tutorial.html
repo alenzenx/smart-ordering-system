@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>智慧點餐系統安裝與內部邏輯教學</title>
+  <style>
+    :root {
+      --ink: #15231f;
+      --paper: #fff7e8;
+      --accent: #f06a3d;
+      --accent-2: #0f8b8d;
+      --muted: #64706c;
+      --code: #11201c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 12%, rgba(240,106,61,.18), transparent 28rem),
+        radial-gradient(circle at 90% 15%, rgba(15,139,141,.18), transparent 24rem),
+        linear-gradient(135deg, #fff7e8, #f4ead7);
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      padding: .8rem 1.2rem;
+      background: rgba(255,247,232,.92);
+      border-bottom: 1px solid rgba(21,35,31,.15);
+      backdrop-filter: blur(12px);
+    }
+    header strong { color: var(--accent); }
+    header span { color: var(--muted); font-size: .95rem; }
+    main { scroll-snap-type: y mandatory; }
+    section.slide {
+      min-height: 100vh;
+      scroll-snap-align: start;
+      padding: 5.5rem clamp(1.2rem, 5vw, 5rem) 3rem;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      align-content: center;
+      gap: 1.2rem;
+      border-bottom: 1px solid rgba(21,35,31,.12);
+    }
+    .slide-card {
+      width: min(1120px, 100%);
+      margin: 0 auto;
+      padding: clamp(1.4rem, 4vw, 3rem);
+      background: rgba(255,255,255,.76);
+      border: 1px solid rgba(21,35,31,.14);
+      border-radius: 32px;
+      box-shadow: 0 24px 90px rgba(21,35,31,.16);
+    }
+    .kicker {
+      color: var(--accent-2);
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin: 0 0 .5rem;
+    }
+    h1, h2 {
+      margin: 0 0 1rem;
+      line-height: 1.08;
+      letter-spacing: -.03em;
+    }
+    h1 { font-size: clamp(2.4rem, 6vw, 5.8rem); }
+    h2 { font-size: clamp(2rem, 4.8vw, 4.6rem); }
+    p, li {
+      font-size: clamp(1.05rem, 2vw, 1.55rem);
+      line-height: 1.65;
+    }
+    ul { margin: 0; padding-left: 1.2em; }
+    li + li { margin-top: .35rem; }
+    code, pre {
+      font-family: "Cascadia Code", Consolas, monospace;
+      background: var(--code);
+      color: #f4ffe9;
+      border-radius: 16px;
+    }
+    code { padding: .1rem .4rem; font-size: .9em; }
+    pre {
+      overflow: auto;
+      padding: 1rem 1.2rem;
+      font-size: clamp(.9rem, 1.7vw, 1.2rem);
+      line-height: 1.5;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1rem;
+      align-items: start;
+    }
+    .shot {
+      width: 100%;
+      border-radius: 22px;
+      border: 1px solid rgba(21,35,31,.18);
+      box-shadow: 0 18px 45px rgba(21,35,31,.18);
+    }
+    .note {
+      margin-top: 1rem;
+      padding: 1rem 1.2rem;
+      border-left: 6px solid var(--accent);
+      background: rgba(240,106,61,.08);
+      color: #3f3c35;
+      border-radius: 14px;
+    }
+    .flow {
+      display: grid;
+      gap: .6rem;
+      font-size: clamp(1rem, 2vw, 1.45rem);
+    }
+    .flow div {
+      padding: .8rem 1rem;
+      border-radius: 999px;
+      background: rgba(15,139,141,.1);
+      border: 1px solid rgba(15,139,141,.25);
+      text-align: center;
+      font-weight: 800;
+    }
+    @media print {
+      header { display: none; }
+      section.slide { min-height: auto; page-break-after: always; }
+      .slide-card { box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>智慧點餐系統教學簡報</strong>
+    <span>使用 PageDown / 捲動切換投影片，可用瀏覽器列印成 PDF</span>
+  </header>
+  <main>
+    <section class="slide"><div class="slide-card"><p class="kicker">Slide 1</p><h1>智慧點餐系統<br>安裝與內部邏輯教學</h1><ul><li>第一次看到專案的人也能照著啟動。</li><li>用少量 PowerShell 指令完成 Docker 啟動。</li><li>理解 Gemini CLI 登入與 actions 更新購物車的邏輯。</li></ul></div></section>
+    <section class="slide"><div class="slide-card"><p class="kicker">Slide 2</p><h2>系統畫面</h2><div class="grid"><div><h3>顧客端</h3><img class="shot" src="../order_system.png" alt="顧客端智慧點餐系統"></div><div><h3>後台</h3><img class="shot" src="../order_system_backstage.png" alt="後台管理系統"></div></div><p class="note">顧客端：localhost:5174。後台：localhost:5173。phpMyAdmin：localhost:8080。</p></div></section>
+    <section class="slide"><div class="slide-card"><p class="kicker">Slide 3</p><h2>系統架構</h2><pre>顧客端 React  : http://localhost:5174
+後台 React    : http://localhost:5173
+Django API    : http://localhost:8000
+MySQL         : localhost:3306
+phpMyAdmin    : http://localhost:8080
+Gemini CLI    : backend container 內呼叫</pre><p class="note">前端負責畫面，Django 負責 API 與驗證，MySQL 負責保存資料。</p></div></section>
+    <section class="slide"><div class="slide-card"><p class="kicker">Slide 4</p><h2>必要安裝</h2><ul><li>必裝：Docker Desktop for Windows。</li><li>建議安裝：Git。</li><li>若要主機端登入 Gemini CLI：Node.js 20 或更新版本。</li><li>不需要手動安裝：Python、MySQL、phpMyAdmin、前端 npm 套件。</li></ul></div></section>
+    <section class="slide"><div class="slide-card"><p class="kicker">Slide 5</p><h2>檢查 Docker 與 Git</h2><pre>docker --version
+docker compose version
+git --version</pre><p class="note">如果 Docker 指令失敗，先打開 Docker Desktop 並等待 Docker Engine 啟動。</p></div></section>
+    <section class="slide"><div class="slide-card"><p class="kicker">Slide 6</p><h2>取得專案</h2><pre>git clone https://github.com/alenzenx/smart-ordering-system.git
+cd smart-ordering-system</pre><p>如果已經有本機資料夾，直接 cd 到專案根目錄。</p><pre>cd "C:\Users\Alen\Documents\New project"</pre></div></section>
+    <section class="slide"><div class="slide-card"><p class="kicker">Slide 7</p><h2>零設定啟動</h2><pre>docker compose up --build -d</pre><pre>docker compose ps</pre><pre>docker compose down</pre><p class="note">第一次會下載 image 與安裝套件，時間較久是正常的。</p></div></section>
+    <section class="slide"><div class="slide-card"><p class="kicker">Slide 8</p><h2>Docker 會啟動哪些服務</h2><ul><li>smart-ordering-db：MySQL 8.4。</li><li>smart-ordering-backend：Django API。</li><li>smart-ordering-admin-frontend：後台 React。</li><li>smart-ordering-customer-frontend：顧客端 React。</li><li>smart-ordering-phpmyadmin：資料庫圖形介面。</li></ul></div></section>
+    <section class="slide"><div class="slide-card"><p class="kicker">Slide 9</p><h2>為什麼本機不必裝一堆套件</h2><ul><li>前端 container 內執行 npm install。</li><li>後端 container 內執行 pip install。</li><li>MySQL 使用 mysql:8.4 image。</li><li>phpMyAdmin 使用 phpmyadmin:5.2-apache image。</li><li>backend Dockerfile 已安裝 @google/gemini-cli。</li></ul></div></section>
+    <section class="slide"><div class="slide-card"><p class="kicker">Slide 10</p><h2>Gemini CLI 的角色</h2><ul><li>有登入：後端優先呼叫 Gemini CLI。</li><li>沒登入：後端退回本地規則模式。</li><li>Gemini 只負責理解語意與候選 actions。</li><li>後端負責驗證與執行 actions。</li></ul></div></section>
+    <section class="slide"><div class="slide-card"><p class="kicker">Slide 11</p><h2>安裝 Gemini CLI</h2><pre>node --version
+npm --version
+npm install -g @google/gemini-cli
+gemini</pre><ul><li>選擇 Login with Google。</li><li>完成瀏覽器登入。</li><li>確認 %USERPROFILE%\.gemini 存在。</li></ul></div></section>
+    <section class="slide"><div class="slide-card"><p class="kicker">Slide 12</p><h2>讓 Docker 使用登入資料</h2><pre>Windows:   %USERPROFILE%\.gemini
+Container: /root/.gemini</pre><pre>docker compose up --build -d backend</pre><p class="note">docker-compose.yml 會把 ${USERPROFILE}/.gemini 掛到 /root/.gemini。</p></div></section>
+    <section class="slide"><div class="slide-card"><p class="kicker">Slide 13</p><h2>顧客端操作</h2><ul><li>開啟 http://localhost:5174。</li><li>用 + / - 加減數量。</li><li>右側購物車即時計算總價。</li><li>可按清空購物車或送出訂單。</li><li>可輸入：來杯冰的、烏龍、兩份、清空。</li></ul></div></section>
+    <section class="slide"><div class="slide-card"><p class="kicker">Slide 14</p><h2>後台操作</h2><ul><li>開啟 http://localhost:5173。</li><li>訂單列表在最上方。</li><li>可新增、修改、刪除菜品。</li><li>可刪除訂單。</li><li>可用 Excel 匯入整份菜單。</li></ul></div></section>
+    <section class="slide"><div class="slide-card"><p class="kicker">Slide 15</p><h2>Excel 匯入規則</h2><pre>菜品名稱 | 菜品價格 | 過敏原 | 菜品介紹</pre><ul><li>匯入時清空 menu_orderitem。</li><li>匯入時清空 menu_order。</li><li>匯入時清空 menu_menuitem。</li><li>菜品 ID 會重新產生。</li></ul></div></section>
+    <section class="slide"><div class="slide-card"><p class="kicker">Slide 16</p><h2>MySQL 與 phpMyAdmin</h2><pre>phpMyAdmin: http://localhost:8080
+Host: localhost
+Port: 3306
+Database: smart_ordering
+User: smart_user
+Password: smart_pass
+Root Password: root_pass</pre></div></section>
+    <section class="slide"><div class="slide-card"><p class="kicker">Slide 17</p><h2>聊天助理內部流程</h2><div class="flow"><div>顧客輸入</div><div>React 送 messages + cart</div><div>POST /api/chat/</div><div>Django 本地規則</div><div>必要時呼叫 Gemini CLI</div><div>後端驗證 actions</div><div>前端依 actions 更新購物車</div></div></div></section>
+    <section class="slide"><div class="slide-card"><p class="kicker">Slide 18</p><h2>actions 是真正更新依據</h2><pre>{"type":"set_quantity","menu_item_id":1,"quantity":2}
+{"type":"remove_item","menu_item_id":1}
+{"type":"clear_cart"}</pre><p class="note">如果 Gemini 文字說已更新但 actions 是空的，後端會攔截，不讓前端顯示假的成功。</p></div></section>
+    <section class="slide"><div class="slide-card"><p class="kicker">Slide 19</p><h2>菜單同步保護</h2><ul><li>顧客端每 5 秒檢查菜單。</li><li>聊天送出前會先同步菜單。</li><li>後台匯入新菜單後，前端清空購物車並重置對話。</li><li>避免舊 menu_item_id 污染新菜單。</li></ul></div></section>
+    <section class="slide"><div class="slide-card"><p class="kicker">Slide 20</p><h2>常用維護指令</h2><pre>docker compose up --build -d --remove-orphans
+docker compose up --build -d backend
+docker compose up --build -d customer-frontend
+docker compose up --build -d admin-frontend
+docker compose logs backend --tail 100
+docker compose down</pre></div></section>
+    <section class="slide"><div class="slide-card"><p class="kicker">Slide 21</p><h2>故障排除</h2><ul><li>網頁打不開：docker compose ps。</li><li>Docker 指令失敗：打開 Docker Desktop。</li><li>Gemini 回覆太簡單：可能正在使用 local-rules。</li><li>Gemini 登入後仍無效：重建 backend。</li><li>Excel 匯入後購物車清空：預期行為。</li></ul></div></section>
+    <section class="slide"><div class="slide-card"><p class="kicker">Slide 22</p><h2>完成檢查清單</h2><ul><li>已能啟動所有服務。</li><li>已能開啟顧客端、後台、phpMyAdmin。</li><li>已能匯入 Excel 菜單。</li><li>已能送出訂單並在後台看到。</li><li>已理解 Gemini CLI 登入資料掛載。</li><li>已理解 actions 才是購物車真正更新依據。</li></ul></div></section>
+  </main>
+</body>
+</html>
