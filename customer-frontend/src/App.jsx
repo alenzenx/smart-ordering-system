@@ -53,7 +53,7 @@ function App() {
   const menuSignatureRef = useRef("");
 
   async function loadMenu(options = {}) {
-    const { showLoading = true, silent = false } = options;
+    const { showLoading = true, silent = false, returnDetails = false } = options;
 
     if (showLoading) {
       setLoading(true);
@@ -73,7 +73,9 @@ function App() {
       const nextSignature = buildMenuSignature(data);
       const previousSignature = menuSignatureRef.current;
 
-      if (previousSignature && previousSignature !== nextSignature) {
+      const changed = Boolean(previousSignature && previousSignature !== nextSignature);
+
+      if (changed) {
         setCart({});
         setChatMessages(initialChatMessages);
         setChatInput("");
@@ -83,10 +85,16 @@ function App() {
 
       menuSignatureRef.current = nextSignature;
       setMenu(data);
+      if (returnDetails) {
+        return { data, changed };
+      }
       return data;
     } catch (err) {
       if (!silent) {
         setError(err.message);
+      }
+      if (returnDetails) {
+        return { data: null, changed: false };
       }
       return null;
     } finally {
@@ -249,8 +257,17 @@ function App() {
     setChatLoading(true);
 
     try {
-      const latestMenu = await loadMenu({ showLoading: false, silent: true });
+      const latestMenuResult = await loadMenu({
+        showLoading: false,
+        silent: true,
+        returnDetails: true,
+      });
+      const latestMenu = latestMenuResult.data;
       const currentMenu = Array.isArray(latestMenu) ? latestMenu : menu;
+      const messagesForRequest = latestMenuResult.changed
+        ? [...initialChatMessages, userMessage]
+        : nextMessages;
+      const cartForRequest = latestMenuResult.changed ? {} : cart;
 
       const response = await fetch("/api/chat/", {
         method: "POST",
@@ -258,11 +275,11 @@ function App() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          messages: nextMessages.map((message) => ({
+          messages: messagesForRequest.map((message) => ({
             role: message.role,
             content: message.content,
           })),
-          cart: Object.entries(cart).map(([menuItemId, quantity]) => ({
+          cart: Object.entries(cartForRequest).map(([menuItemId, quantity]) => ({
             menu_item_id: Number(menuItemId),
             quantity,
           })),
@@ -280,8 +297,8 @@ function App() {
 
       applyChatActions(data.actions);
 
-      setChatMessages((current) => [
-        ...current,
+      setChatMessages([
+        ...messagesForRequest,
         {
           role: "assistant",
           content: data.reply || "已為您更新購物車。",

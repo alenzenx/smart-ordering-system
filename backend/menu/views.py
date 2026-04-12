@@ -467,6 +467,30 @@ def find_latest_user_message(messages):
     return ""
 
 
+def build_latest_user_turn(messages):
+    latest_message = find_latest_user_message(messages)
+    if not latest_message:
+        return messages[-1:]
+    return [{"role": "user", "content": latest_message}]
+
+
+def is_unhelpful_model_reply(reply):
+    normalized = str(reply or "").strip()
+    if not normalized:
+        return False
+
+    refusal_markers = (
+        "抱歉",
+        "我無法",
+        "無法隨機",
+        "不能隨機",
+        "我不能",
+        "我只能",
+        "沒有辦法",
+    )
+    return any(marker in normalized for marker in refusal_markers)
+
+
 def build_action_reply(actions):
     if not actions:
         return ""
@@ -1141,11 +1165,82 @@ def format_menu_item_brief(item):
     return f"{item.name}（NT$ {item.price}）"
 
 
+def extract_budget_amount(text):
+    amounts = []
+    for match in re.finditer(r"(?:NT\$?\s*)?(\d{2,5})(?:\s*(?:元|塊|台幣|ntd|NTD))?", text):
+        try:
+            amounts.append(Decimal(match.group(1)))
+        except InvalidOperation:
+            continue
+    return max(amounts) if amounts else None
+
+
+def build_budget_combo_reply(latest_message):
+    combo_keywords = ("湊", "預算", "套餐", "組合", "搭配", "配一套", "配餐")
+    if not any(keyword in latest_message for keyword in combo_keywords):
+        return None
+
+    target_amount = extract_budget_amount(latest_message)
+    if target_amount is None:
+        return None
+
+    menu_items = [
+        item
+        for item in MenuItem.objects.all().order_by("-price", "id")
+        if item.price > 0
+    ]
+    if not menu_items:
+        return {
+            "reply": "目前沒有可搭配的菜品。",
+            "actions": [],
+        }
+
+    chosen_items = []
+    remaining = target_amount
+    for item in menu_items:
+        if len(chosen_items) >= 5:
+            break
+        if item.price <= remaining:
+            chosen_items.append(item)
+            remaining -= item.price
+
+    if not chosen_items:
+        cheapest_item = min(menu_items, key=lambda item: item.price)
+        return {
+            "reply": (
+                f"目前最便宜的品項是 {cheapest_item.name}（NT$ {cheapest_item.price}），"
+                f"已超過您指定的 NT$ {target_amount:.2f}，所以先不加入購物車。"
+            ),
+            "actions": [],
+        }
+
+    total_price = sum((item.price for item in chosen_items), Decimal("0.00"))
+    return {
+        "reply": (
+            "我幫您搭配："
+            + "、".join(format_menu_item_brief(item) for item in chosen_items)
+            + f"，合計 NT$ {total_price:.2f}，已加入購物車。"
+        ),
+        "actions": [
+            {
+                "type": "set_quantity",
+                "menu_item_id": item.id,
+                "quantity": 1,
+            }
+            for item in chosen_items
+        ],
+    }
+
+
 def build_local_menu_reply(latest_message, cart_snapshot):
     price_keywords = ("多少錢", "價格", "價錢", "多少")
     allergen_keywords = ("過敏原", "會過敏", "有什麼不能吃")
     description_keywords = ("介紹", "是什麼", "內容", "說明")
     recommendation_keywords = ("推薦", "有什麼", "想吃", "吃什麼", "來點", "套餐")
+
+    budget_combo_reply = build_budget_combo_reply(latest_message)
+    if budget_combo_reply:
+        return budget_combo_reply
 
     mentioned_item_ids = find_item_ids_in_text(latest_message)
     mentioned_items = get_menu_items_in_order(mentioned_item_ids[:5])
@@ -1263,7 +1358,7 @@ def build_zero_config_chat_response(messages, cart_snapshot, model):
         }
 
     try:
-        response_text = call_gemini_cli(model, messages, cart_snapshot)
+        response_text = call_gemini_cli(model, build_latest_user_turn(messages), cart_snapshot)
         parsed_response = parse_chat_response(response_text)
     except (RuntimeError, subprocess.TimeoutExpired, ValueError, json.JSONDecodeError, OSError, Exception):
         parsed_response = build_local_menu_reply(find_latest_user_message(messages), cart_snapshot)
@@ -1279,6 +1374,13 @@ def build_zero_config_chat_response(messages, cart_snapshot, model):
             parsed_response["actions"] = fallback_actions
             if not parsed_response["reply"]:
                 parsed_response["reply"] = build_action_reply(fallback_actions)
+
+    if not parsed_response["actions"]:
+        local_response = build_local_menu_reply(find_latest_user_message(messages), cart_snapshot)
+        if local_response["actions"]:
+            parsed_response = local_response
+        elif is_unhelpful_model_reply(parsed_response["reply"]):
+            parsed_response = local_response
 
     if not parsed_response["reply"]:
         local_response = build_local_menu_reply(find_latest_user_message(messages), cart_snapshot)
