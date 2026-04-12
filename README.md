@@ -72,6 +72,28 @@ docker compose version
 git --version
 ```
 
+### 不需要另外安裝：Node.js、Python、MySQL、phpMyAdmin
+
+如果你用 Docker 啟動，本機不需要另外安裝 Node.js、Python、MySQL 或 phpMyAdmin，原因如下：
+
+- `admin-frontend` 與 `customer-frontend` 會在 Node 容器內執行 `npm install` 與 `npm run dev`。
+- `backend` 會在 Python 容器內安裝 `backend/requirements.txt`。
+- `db` 會自動使用 `mysql:8.4` Docker image。
+- `phpmyadmin` 會自動使用 `phpmyadmin:5.2-apache` Docker image。
+- `backend` image 內已安裝 Node，並在 build 時執行 `npm install -g @google/gemini-cli@latest`。
+
+也就是說，正常使用本專案時，你不需要在 Windows 主機手動安裝前端或後端依賴。
+
+## 零設定啟動
+
+在專案根目錄執行則可啟動：
+
+```powershell
+docker compose up --build -d
+```
+
+第一次啟動會需要下載 Docker images 並安裝容器內套件，時間會比較久。後續重建通常會快很多。
+
 ## 必裝：Gemini CLI 安裝與登入
 
 Gemini 助理有兩層行為：
@@ -118,28 +140,6 @@ volumes:
 ```
 
 只要這個資料夾內有有效登入資料，backend container 裡的 Gemini CLI 就可以使用。
-
-### 不需要另外安裝：Node.js、Python、MySQL、phpMyAdmin
-
-如果你用 Docker 啟動，本機不需要另外安裝 Node.js、Python、MySQL 或 phpMyAdmin，原因如下：
-
-- `admin-frontend` 與 `customer-frontend` 會在 Node 容器內執行 `npm install` 與 `npm run dev`。
-- `backend` 會在 Python 容器內安裝 `backend/requirements.txt`。
-- `db` 會自動使用 `mysql:8.4` Docker image。
-- `phpmyadmin` 會自動使用 `phpmyadmin:5.2-apache` Docker image。
-- `backend` image 內已安裝 Node，並在 build 時執行 `npm install -g @google/gemini-cli@latest`。
-
-也就是說，正常使用本專案時，你不需要在 Windows 主機手動安裝前端或後端依賴。
-
-## 零設定啟動
-
-在專案根目錄執行則可啟動：
-
-```powershell
-docker compose up --build -d
-```
-
-第一次啟動會需要下載 Docker images 並安裝容器內套件，時間會比較久。後續重建通常會快很多。
 
 查看服務狀態：
 
