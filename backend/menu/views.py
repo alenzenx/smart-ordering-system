@@ -460,6 +460,55 @@ def parse_chat_response(response_text):
     }
 
 
+def actions_mutate_cart(actions):
+    return any(
+        action.get("type") in {"set_quantity", "remove_item", "clear_cart"}
+        for action in actions
+        if isinstance(action, dict)
+    )
+
+
+def reply_claims_cart_mutation(reply):
+    normalized = str(reply or "")
+    mutation_markers = (
+        "已加入",
+        "已加到",
+        "加入購物車",
+        "已更新",
+        "更新為",
+        "已為您更新",
+        "已移除",
+        "已刪除",
+        "已取消",
+        "已清空",
+        "清空購物車",
+        "已將",
+    )
+    return any(marker in normalized for marker in mutation_markers)
+
+
+def bind_reply_to_actions(parsed_response, messages, cart_snapshot):
+    actions = parsed_response.get("actions", [])
+    if actions_mutate_cart(actions):
+        parsed_response["reply"] = build_action_reply(actions)
+        return parsed_response
+
+    fallback_actions = infer_actions_from_latest_message(messages, cart_snapshot)
+    if fallback_actions:
+        return {
+            "reply": build_action_reply(fallback_actions),
+            "actions": fallback_actions,
+        }
+
+    if reply_claims_cart_mutation(parsed_response.get("reply", "")):
+        return {
+            "reply": "我還沒有更新購物車。請說明品項名稱與數量，或回覆「我要」承接上一個明確品項。",
+            "actions": [],
+        }
+
+    return parsed_response
+
+
 def find_latest_user_message(messages):
     for message in reversed(messages):
         if message["role"] == "user":
@@ -553,6 +602,22 @@ def is_contextual_order_message(text):
     )
 
 
+def is_quantity_only_message(text):
+    normalized = normalize_lookup_text(text)
+    quantity = extract_quantity_from_text(text, default=None)
+    if quantity is None:
+        return False
+
+    quantity_words = ("零", "〇", "一", "二", "兩", "三", "四", "五", "六", "七", "八", "九", "十")
+    unit_words = ("份", "杯", "個", "碗", "盤", "瓶", "罐", "條", "顆", "籠", "客")
+    command_words = ("改", "改成", "改為", "換", "要", "來", "加", "點", "變成")
+
+    has_quantity = any(char.isdigit() for char in normalized) or any(word in normalized for word in quantity_words)
+    has_unit = any(word in normalized for word in unit_words)
+    has_contextual_command = any(word in normalized for word in command_words)
+    return has_quantity and (has_unit or has_contextual_command) and len(normalized) <= 8
+
+
 def build_action_reply(actions):
     if not actions:
         return ""
@@ -634,7 +699,7 @@ def parse_chinese_number(token):
 
 def extract_quantity_from_text(text, default=1):
     patterns = [
-        r"(?:加|來|點|要|給我|幫我加|幫我點|再來|再加|改成|改為|改成)\s*([0-9零〇一二兩三四五六七八九十]+)",
+        r"(?:加|來|點|要|給我|幫我加|幫我點|再來|再加|改|改成|改為|換|變成)\s*([0-9零〇一二兩三四五六七八九十]+)",
         r"([0-9零〇一二兩三四五六七八九十]+)\s*(?:份|個|杯|碗|盤|瓶|罐|條|顆|籠|客|份量)",
     ]
 
@@ -762,6 +827,21 @@ def infer_actions_from_latest_message(messages, cart_snapshot):
     mentioned_menu_items = find_referenced_menu_item_ids(latest_message)
     previous_user_message = find_previous_user_message(messages)
 
+    if is_quantity_only_message(latest_message):
+        quantity = extract_quantity_from_text(latest_message, default=1)
+        recent_item_ids = find_recent_referenced_menu_item_ids(messages)
+        target_item_ids = recent_item_ids or (cart_item_ids if len(cart_item_ids) == 1 else [])
+        if target_item_ids:
+            return normalize_chat_actions(
+                [
+                    {
+                        "type": "set_quantity",
+                        "menu_item_id": target_item_ids[0],
+                        "quantity": quantity,
+                    }
+                ]
+            )
+
     if is_contextual_order_message(latest_message):
         recent_item_ids = find_recent_referenced_menu_item_ids(messages)
         if recent_item_ids:
@@ -874,6 +954,7 @@ def infer_actions_from_latest_message(messages, cart_snapshot):
 def build_chat_instruction(cart_snapshot):
     return (
         "你是智慧點餐系統中的點餐助理。請使用繁體中文回答，回覆要直接、清楚、簡短。"
+        "你只負責理解使用者意圖與產生候選 actions，後端會驗證並執行 actions。"
         "你只能根據提供的菜單資料推薦、說明價格、提醒過敏原，或幫客人操作購物車。"
         "你不能直接送出訂單，只能透過 actions 控制購物車。"
         "你必須只回傳 JSON，不要加 markdown、不要加說明文字。"
@@ -881,8 +962,13 @@ def build_chat_instruction(cart_snapshot):
         "actions 可用的類型只有："
         'set_quantity（需要 menu_item_id 與 quantity，可新增或改數量，quantity=0 代表移除）、'
         'remove_item（需要 menu_item_id）、clear_cart（不需要其他欄位）。'
+        "如果 reply 說已加入、已更新、已移除或已清空，actions 必須包含對應動作。"
+        "如果 actions 是空陣列，reply 絕對不能說已經更新購物車。"
         "如果使用者只是詢問菜單資訊，不要亂動購物車，actions 請回傳空陣列。"
         "如果使用者要求加入、刪除、修改購物車，你必須優先使用菜單中的正確 ID。"
+        "如果使用者只說好、對、我要、來一份、兩份、改兩杯、就這個，請根據最近一次明確提到或推薦的菜品判斷。"
+        "如果最近上下文只有一個明確菜品，省略句要套用到該菜品。"
+        "如果最近上下文有多個候選品項，模糊詞只能在最近候選品項中比對，不可以擴大到全菜單。"
         "若菜單沒有對應品項，reply 要明確說明找不到，actions 保持空陣列。"
         f"\n\n目前菜單：\n{build_menu_context()}"
         f"\n\n目前購物車：\n{build_cart_context(cart_snapshot)}"
@@ -1598,6 +1684,7 @@ def build_zero_config_chat_response(messages, cart_snapshot, model):
         parsed_response = parse_chat_response(response_text)
     except (RuntimeError, subprocess.TimeoutExpired, ValueError, json.JSONDecodeError, OSError, Exception):
         parsed_response = build_local_menu_reply(find_latest_user_message(messages), cart_snapshot)
+        parsed_response = bind_reply_to_actions(parsed_response, messages, cart_snapshot)
         return {
             "reply": parsed_response["reply"],
             "actions": parsed_response["actions"],
@@ -1623,6 +1710,8 @@ def build_zero_config_chat_response(messages, cart_snapshot, model):
         parsed_response["reply"] = local_response["reply"]
         if not parsed_response["actions"]:
             parsed_response["actions"] = local_response["actions"]
+
+    parsed_response = bind_reply_to_actions(parsed_response, messages, cart_snapshot)
 
     return {
         "reply": parsed_response["reply"],
