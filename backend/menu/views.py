@@ -524,6 +524,35 @@ def is_confirmation_message(text):
     }
 
 
+def is_contextual_order_message(text):
+    normalized = normalize_lookup_text(text)
+    if is_confirmation_message(text):
+        return True
+
+    order_phrases = (
+        "我要",
+        "要這個",
+        "點這個",
+        "選這個",
+        "來一份",
+        "來一杯",
+        "來一個",
+        "好來一份",
+        "好來一杯",
+        "好我要",
+        "就這個",
+        "就來這個",
+        "那就這個",
+    )
+    if any(phrase in normalized for phrase in order_phrases):
+        return True
+
+    return (
+        any(verb in normalized for verb in ("來", "要", "點", "加"))
+        and any(unit in normalized for unit in ("份", "杯", "個", "碗", "盤", "瓶", "罐"))
+    )
+
+
 def build_action_reply(actions):
     if not actions:
         return ""
@@ -689,6 +718,20 @@ def find_referenced_menu_item_ids(text, item_ids=None):
     return matches
 
 
+def find_contextual_fragment_item_ids(text, item_ids):
+    normalized_text = normalize_lookup_text(text)
+    if len(normalized_text) < 2:
+        return []
+
+    matches = []
+    for item in MenuItem.objects.filter(id__in=item_ids):
+        haystack = normalize_lookup_text(f"{item.name} {item.description or ''}")
+        if normalized_text in haystack:
+            matches.append(item.id)
+
+    return matches
+
+
 def find_recent_referenced_menu_item_ids(messages):
     latest_user_skipped = False
     for message in reversed(messages):
@@ -719,7 +762,7 @@ def infer_actions_from_latest_message(messages, cart_snapshot):
     mentioned_menu_items = find_referenced_menu_item_ids(latest_message)
     previous_user_message = find_previous_user_message(messages)
 
-    if is_confirmation_message(latest_message):
+    if is_contextual_order_message(latest_message):
         recent_item_ids = find_recent_referenced_menu_item_ids(messages)
         if recent_item_ids:
             return normalize_chat_actions(
@@ -735,10 +778,26 @@ def infer_actions_from_latest_message(messages, cart_snapshot):
     if any(keyword in latest_message for keyword in info_keywords):
         return []
 
-    if any(keyword in latest_message for keyword in clear_keywords) and "購物車" in latest_message:
+    if any(keyword in latest_message for keyword in clear_keywords) and not any(
+        blocked_keyword in latest_message for blocked_keyword in ("菜單", "菜品", "全部資料")
+    ):
         return [{"type": "clear_cart"}]
 
     id_match = re.search(r"ID\s*(\d+)", latest_message, re.IGNORECASE)
+    if id_match and (
+        is_contextual_order_message(latest_message)
+        or any(keyword in latest_message for keyword in update_keywords + add_keywords)
+    ):
+        return normalize_chat_actions(
+            [
+                {
+                    "type": "set_quantity",
+                    "menu_item_id": int(id_match.group(1)),
+                    "quantity": extract_quantity_from_text(latest_message, default=1),
+                }
+            ]
+        )
+
     if id_match and any(keyword in latest_message for keyword in delete_keywords):
         return normalize_chat_actions(
             [
@@ -1261,6 +1320,46 @@ def format_menu_item_brief(item):
     return f"{item.name}（NT$ {item.price}）"
 
 
+def format_menu_item_detail(item):
+    allergens = item.allergens or "未標示過敏原"
+    description = item.description or "目前沒有更多介紹"
+    return f"ID {item.id}｜{item.name}｜NT$ {item.price}｜過敏原：{allergens}｜{description}"
+
+
+def build_contextual_menu_reply(messages):
+    latest_message = find_latest_user_message(messages)
+    if not latest_message:
+        return None
+
+    recent_item_ids = find_recent_referenced_menu_item_ids(messages)
+    if not recent_item_ids:
+        return None
+
+    matched_item_ids = find_referenced_menu_item_ids(latest_message, recent_item_ids)
+    if not matched_item_ids:
+        matched_item_ids = find_contextual_fragment_item_ids(latest_message, recent_item_ids)
+    if not matched_item_ids:
+        return None
+
+    matched_items = get_menu_items_in_order(matched_item_ids[:5])
+    if not matched_items:
+        return None
+
+    if len(matched_items) == 1:
+        item = matched_items[0]
+        return {
+            "reply": f"您剛剛提到的選項中，符合的是 {format_menu_item_detail(item)}。如果要點，請回覆「我要」或「來一份」。",
+            "actions": [],
+        }
+
+    return {
+        "reply": "您剛剛提到的選項中，符合的是：\n"
+        + "\n".join(f"- {format_menu_item_detail(item)}" for item in matched_items)
+        + "\n請回覆完整品名或說「我要 ID 編號」。",
+        "actions": [],
+    }
+
+
 def extract_budget_amount(text):
     amounts = []
     for match in re.finditer(r"(?:NT\$?\s*)?(\d{2,5})(?:\s*(?:元|塊|台幣|ntd|NTD))?", text):
@@ -1483,6 +1582,14 @@ def build_zero_config_chat_response(messages, cart_snapshot, model):
         return {
             "reply": local_response["reply"],
             "actions": local_response["actions"],
+            "model": "local-rules",
+        }
+
+    contextual_response = build_contextual_menu_reply(messages)
+    if contextual_response:
+        return {
+            "reply": contextual_response["reply"],
+            "actions": contextual_response["actions"],
             "model": "local-rules",
         }
 
