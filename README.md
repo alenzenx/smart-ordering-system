@@ -2,7 +2,7 @@
 
 本專案是一套本機 Docker 化的智慧點餐系統，包含顧客點餐網頁、後台管理網頁、Django API、MySQL 資料庫、phpMyAdmin 圖形化資料庫介面，以及 Gemini 點餐助理。
 
-## 強烈建議先看「 智慧點餐系統 安裝使用與 vibe coding 教學.pptx 」
+## 強烈建議先看 [「 智慧點餐系統 安裝使用與 vibe coding 教學.pptx 」](https://github.com/alenzenx/smart-ordering-system/blob/main/%E6%99%BA%E6%85%A7%E9%BB%9E%E9%A4%90%E7%B3%BB%E7%B5%B1%20%E5%AE%89%E8%A3%9D%E4%BD%BF%E7%94%A8%E8%88%87%20vibe%20coding%20%E6%95%99%E5%AD%B8.pptx)
 
 ## 系統需求
 Windows 10、11
