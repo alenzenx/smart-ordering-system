@@ -2,7 +2,7 @@
 
 本專案是一套本機 Docker 化的智慧點餐系統，包含顧客點餐網頁、後台管理網頁、Django API、MySQL 資料庫、phpMyAdmin 圖形化資料庫介面，以及 Gemini 點餐助理。
 
-## 強烈建議先看 智慧點餐系統 安裝使用與 vibe coding 教學.pptx
+## 強烈建議先看「 智慧點餐系統 安裝使用與 vibe coding 教學.pptx 」
 
 ## 系統需求
 Windows 10、11
