@@ -1,0 +1,123 @@
+請幫我仿造一個「智慧餐廳點餐系統」專案，參考https://github.com/alenzenx/smart-ordering-system，功能和架構要盡量接近下面需求。
+
+技術架構：
+- 前端使用 React + Vite
+- 後端使用 Django API
+- 資料庫使用 MySQL
+- 使用 Docker Compose 一鍵啟動
+- 另外提供 phpMyAdmin 管理 MySQL
+- AI 聊天助手照著 https://github.com/alenzenx/smart-ordering-system 必裝：Gemini CLI 安裝與登入那樣設計
+ 
+
+需要做兩個前端：
+1. 顧客點餐頁
+- 顯示完整菜單列表
+- 每個餐點要有 ID、名稱、描述、價格、過敏原資訊
+- 可以用 + / - 調整餐點數量
+- 有購物車區塊，顯示已選餐點、數量、小計、總數量、總金額
+- 可以清空購物車
+- 可以送出訂單
+- 送出成功後清空購物車並顯示訂單編號
+- 每隔幾秒自動重新載入菜單，如果後台菜單有變動，顧客端要更新
+- 要有 AI 聊天助手，可以用自然語言問菜單、推薦餐點、查價格、查過敏原、加入餐點、移除餐點、清空購物車
+- AI 回傳格式要包含 reply 和 actions，前端依 actions 更新購物車
+
+2. 後台管理頁
+- 顯示目前訂單列表
+- 訂單要顯示訂單 ID、建立時間、餐點明細、數量、單價、小計、總金額
+- 可以刪除訂單
+- 顯示目前菜單列表
+- 可以新增菜單項目
+- 可以編輯菜單項目
+- 可以刪除菜單項目
+- 表單欄位包含名稱、描述、價格、過敏原
+- 支援上傳 Excel .xlsx 匯入菜單
+- 匯入 Excel 時可以清空舊菜單和舊訂單，再匯入新的菜單資料
+- 後台訂單列表每隔幾秒自動更新
+
+後端 Django API：
+- GET /api/menu-items/
+- POST /api/menu-items/
+- GET /api/menu-items/<id>/
+- PUT /api/menu-items/<id>/
+- DELETE /api/menu-items/<id>/
+- POST /api/menu-items/import-xlsx/
+- GET /api/orders/
+- POST /api/orders/
+- GET /api/orders/<id>/
+- DELETE /api/orders/<id>/
+- POST /api/chat/
+
+資料模型：
+- MenuItem：name、description、price、allergens
+- Order：created_at、total_price
+- OrderItem：order、menu_item、quantity、unit_price、line_total
+
+AI 聊天 actions 格式：
+[
+  {
+    "type": "set_quantity",
+    "menu_item_id": 1,
+    "quantity": 2
+  },
+  {
+    "type": "remove_item",
+    "menu_item_id": 1
+  },
+  {
+    "type": "clear_cart"
+  }
+]
+
+AI 聊天 API 回傳格式：
+{
+  "reply": "已幫你加入餐點",
+  "actions": [
+    {
+      "type": "set_quantity",
+      "menu_item_id": 1,
+      "quantity": 2
+    }
+  ],
+  "model": "gemini-2.5-flash"
+}
+
+Excel 匯入格式：
+- 餐點名稱
+- 餐點價格
+- 過敏原
+- 餐點描述
+
+Docker Compose 需要包含：
+- backend
+- customer-frontend
+- admin-frontend
+- mysql
+- phpmyadmin
+
+預設網址：
+- 顧客點餐頁：http://localhost:5174
+- 後台管理頁：http://localhost:5173
+- Django API：http://localhost:8000
+- phpMyAdmin：http://localhost:8080
+- MySQL：localhost:3306
+
+UI 風格：
+- 做成現代餐廳點餐系統
+- 顧客端要有菜單區、購物車區、AI 助手區
+- 後台要有側邊欄、訂單管理、菜單管理、Excel 匯入
+- 介面乾淨、直覺、適合專題展示
+- 所有錯誤和成功操作都要有提示訊息
+
+請產生完整可執行的專案，包含：
+- frontend 原始碼
+- backend 原始碼
+- docker-compose.yml
+- .env.example
+- README.md
+- requirements.txt
+- package.json
+- 基本資料庫 migration
+- Excel 匯入處理
+- Gemini / AI 聊天處理
+- 沒有 Gemini 時仍可用的本地規則回覆
